@@ -6,11 +6,16 @@
 
 // Mock the database pool before requiring the service
 jest.mock("../db/pool", () => ({
-  query: jest.fn(),
+  query: jest.fn().mockResolvedValue({ rows: [{ id: "1", user_address: "Gtest", type: "test", title: "test", body: "test", read: false, job_id: "1", link_path: "/test", created_at: new Date() }] }),
+}));
+
+jest.mock("axios", () => ({
+  post: jest.fn().mockResolvedValue({ status: 200 }),
 }));
 
 const {
   generateEmailContent,
+  notifyEscrowEvent,
   EVENT_TYPES,
 } = require("./notificationService");
 
@@ -125,6 +130,24 @@ describe("Notification Service", () => {
       // Job title should be included in both text and HTML versions
       expect(content.text).toContain(dataWithSpecialChars.jobTitle);
       expect(content.html).toContain(dataWithSpecialChars.jobTitle);
+    });
+  });
+
+  describe("notifyEscrowEvent", () => {
+    test("should return a promise and not block", () => {
+      const result = notifyEscrowEvent({
+        eventType: EVENT_TYPES.ESCROW_RELEASED,
+        jobId: "123e4567-e89b-12d3-a456-426614174000",
+        clientAddress: "GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGH",
+        freelancerAddress: "GHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
+        data: {
+          jobTitle: "Test Job",
+          jobId: "123e4567-e89b-12d3-a456-426614174000",
+          amount: "100",
+          currency: "XLM",
+        },
+      });
+      expect(result).toBeInstanceOf(Promise);
     });
   });
 

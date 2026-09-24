@@ -25,6 +25,9 @@ function defaultJobRow(overrides = {}) {
     screening_questions: overrides.screening_questions || [],
     milestones: overrides.milestones || [],
     visibility: overrides.visibility || "public",
+    bidding_closed_at: overrides.bidding_closed_at || null,
+    extended_count: overrides.extended_count ?? 0,
+    extended_until: overrides.extended_until || null,
     created_at: overrides.created_at || new Date().toISOString(),
     updated_at: overrides.updated_at || new Date().toISOString(),
   };
@@ -49,6 +52,11 @@ function createPgMock() {
   const jobs = new Map();
   const applications = new Map();
   const invitations = new Set();
+  const indexerState = {
+    synced: true,
+    last_processed_ledger: null,
+    last_transaction_at: null,
+  };
 
   const query = jest.fn(async (sql, params = []) => {
     const text = sql.replace(/\s+/g, " ").trim();
@@ -90,6 +98,16 @@ function createPgMock() {
       const row = jobs.get(params[1]);
       if (!row) return { rows: [] };
       row.escrow_contract_id = params[0];
+      row.updated_at = new Date().toISOString();
+      jobs.set(row.id, row);
+      return { rows: [row] };
+    }
+
+    if (text.includes("UPDATE jobs") && text.includes("bidding_closed_at")) {
+      const jobId = params[params.length - 1];
+      const row = jobs.get(jobId);
+      if (!row) return { rows: [] };
+      row.bidding_closed_at = params[0] && !isNaN(Date.parse(params[0])) ? params[0] : new Date().toISOString();
       row.updated_at = new Date().toISOString();
       jobs.set(row.id, row);
       return { rows: [row] };
@@ -229,6 +247,17 @@ function createPgMock() {
       return { rows: [row] };
     }
 
+    if (text.startsWith("SELECT synced, last_processed_ledger")) {
+      return { rows: [indexerState] };
+    }
+
+    if (text.startsWith("UPDATE indexer_state")) {
+      indexerState.synced = params[0];
+      indexerState.last_processed_ledger = params[1];
+      indexerState.last_transaction_at = params[2];
+      return { rowCount: 1 };
+    }
+
     return { rows: [] };
   });
 
@@ -246,11 +275,14 @@ function createPgMock() {
     jobs.clear();
     applications.clear();
     invitations.clear();
+    indexerState.synced = true;
+    indexerState.last_processed_ledger = null;
+    indexerState.last_transaction_at = null;
     query.mockClear();
     connect.mockClear();
   }
 
-  return { query, connect, jobs, applications, invitations, reset };
+  return { query, connect, jobs, applications, invitations, reset, indexerState };
 }
 
 module.exports = { createPgMock, defaultJobRow, defaultApplicationRow };

@@ -112,18 +112,22 @@ router.post(
         txHash: contractTxHash || `offchain-${Date.now()}`,
       });
 
-      // Notify users about escrow release
-      await notifyEscrowEvent({
-        eventType: EVENT_TYPES.ESCROW_RELEASED,
-        jobId,
-        clientAddress: job.clientAddress,
-        freelancerAddress: job.freelancerAddress,
-        data: {
-          jobTitle: job.title,
+      // Notify users about escrow release (async, non-blocking)
+      setImmediate(() => {
+        notifyEscrowEvent({
+          eventType: EVENT_TYPES.ESCROW_RELEASED,
           jobId,
-          amount: job.budget,
-          currency: job.currency,
-        },
+          clientAddress: job.clientAddress,
+          freelancerAddress: job.freelancerAddress,
+          data: {
+            jobTitle: job.title,
+            jobId,
+            amount: job.budget,
+            currency: job.currency,
+          },
+        }).catch(err => {
+          console.error("[escrow] async notification failed:", err.message);
+        });
       });
 
       res.json({ success: true, message: "Escrow released and job completed" });
@@ -212,21 +216,25 @@ router.post("/:jobId/refund", async (req, res, next) => {
       txHash: contractTxHash || `offchain-${Date.now()}`,
     });
 
-    // Notify users about refund
-    await notifyEscrowEvent({
-      eventType: EVENT_TYPES.REFUND_ISSUED,
-      jobId,
-      clientAddress: job.clientAddress,
-      freelancerAddress: job.freelancerAddress,
-      data: {
-        jobTitle: job.title,
-        jobId,
-        amount: job.budget,
-        currency: job.currency,
-      },
-    });
+      // Notify users about refund (async, non-blocking)
+      setImmediate(() => {
+        notifyEscrowEvent({
+          eventType: EVENT_TYPES.REFUND_ISSUED,
+          jobId,
+          clientAddress: job.clientAddress,
+          freelancerAddress: job.freelancerAddress,
+          data: {
+            jobTitle: job.title,
+            jobId,
+            amount: job.budget,
+            currency: job.currency,
+          },
+        }).catch(err => {
+          console.error("[escrow] async notification failed:", err.message);
+        });
+      });
 
-    res.json({ success: true, message: "Escrow refunded" });
+      res.json({ success: true, message: "Escrow refunded" });
   } catch (e) {
     next(e);
   }

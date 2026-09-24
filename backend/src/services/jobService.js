@@ -387,6 +387,7 @@ async function listJobs({
   cursor,
   // eslint-disable-next-line no-unused-vars
   timezone,
+  // eslint-disable-next-line no-unused-vars
   includeExpired,
   viewerAddress,
   min_budget,
@@ -403,8 +404,9 @@ async function listJobs({
   if (status && status !== "all") {
     params.push(status);
     conditions.push(`status = $${params.length}`);
-  } else if (!includeExpired) {
-    conditions.push("status != 'expired'");
+  } else if (!status) {
+    params.push("open");
+    conditions.push(`status = $${params.length}`);
   }
 
   if (category) {

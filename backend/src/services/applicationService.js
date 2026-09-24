@@ -283,6 +283,30 @@ async function closeBiddingForJob(jobId, clientAddress) {
   return { jobId, biddingClosedAt: rows[0]?.bidding_closed_at || null };
 }
 
+async function extendBiddingClose(jobId, clientAddress) {
+  validatePublicKey(clientAddress);
+  const job = await getJob(jobId);
+  if (job.clientAddress !== clientAddress) {
+    const e = new Error("Only the job client can extend bidding");
+    e.status = 403;
+    throw e;
+  }
+  if (!job.biddingClosedAt) {
+    const e = new Error("Bidding has not been closed yet");
+    e.status = 409;
+    throw e;
+  }
+
+  const newBiddingClose = new Date(job.biddingClosedAt);
+  newBiddingClose.setMinutes(newBiddingClose.getMinutes() + 10);
+
+  const { rows } = await pool.query(
+    "UPDATE jobs SET bidding_closed_at = $1, updated_at = NOW() WHERE id = $2 RETURNING bidding_closed_at",
+    [newBiddingClose.toISOString(), jobId],
+  );
+  return { jobId, biddingClosedAt: rows[0]?.bidding_closed_at || null };
+}
+
 function hashBidReveal(bidAmount, nonce) {
   return crypto
     .createHash("sha256")
@@ -572,5 +596,6 @@ module.exports = {
   acceptApplication,
   withdrawApplication,
   closeBiddingForJob,
+  extendBiddingClose,
   revealApplicationBid,
 };
